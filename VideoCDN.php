@@ -1,8 +1,8 @@
 <?php
-function search($data) {
-	$apiToken = 'ANCg5OcIUSP5vKaIv9wQETxeebxM2U5D';
+function videocdn_get($query, $type) {
+	$apiToken = 'ApiKey';
 	// Собираем API запрос
-	$url = 'https://videocdn.tv/api/short?api_token=' . $apiToken . '&' . http_build_query($data);
+	$url = 'https://videocdn.tv/api/' . $type . '?api_token=' . $apiToken . '&' . http_build_query($query);
 	// Делаем запрос
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_URL, $url);
@@ -13,51 +13,55 @@ function search($data) {
 	curl_close($ch);
 	// Расшифровываем JSON ответ
 	$json = json_decode(($results), true);
-	if (isset($json['data']['0'])) {
-		// Упрощаем путь к данным
-		$json = $json['data']['0'];
-		// Смотрим получили ли мы ссылку на плеер
-		if ($json['iframe_src'] != '') {
-			// Заносим их в более понятный масив для дальнейшей работы с ним
-			$response['status'] = 'true';
-			$response['title'] = $json['title'];
-			$response['orig_title'] = $json['orig_title'];
-			$response['kinopoisk_id'] = $json['kp_id'];
-			$response['released'] = $json['year'];
-			$response['type'] = $json['type'];
-			$response['src'] = $json['iframe_src'];
-		}
-		else {
-			$response['status'] = 'fail';
-			$response['title'] = '';
-			$response['orig_title'] = '';
-			$response['kinopoisk_id'] = '';
-			$response['released'] = '';
-			$response['type'] = '';
-			$response['src'] = '';
+	if (isset($json['data']) && $json['data'][0] != NULL) {
+		foreach ($json['data'] as $json) {
+			if ($json['ru_title'] == $query['query']) {
+				// Заносим их в более понятный масив для дальнейшей работы с ним
+				$response['status'] = 'true';
+				$response['data'] = $json;
+				break;
+			}
+			else {
+				$response['status'] = 'false';
+			}
 		}
 	}
 	else {
-		$response['status'] = 'fail';
-		$response['title'] = '';
-		$response['orig_title'] = '';
-		$response['kinopoisk_id'] = '';
-		$response['released'] = '';
-		$response['type'] = '';
-		$response['src'] = '';
+		$response['status'] = 'false';
 	}
 	return json_encode($response);
 }
-// Какими данннымы будем делать запрос
-$search = [
-//'id'            => '8'              // Внутренний ID
-//'title'         => 'Резидент'       // По названию
-//'kinopoisk_id'  => '1013917'        // По id кинопоиска
-'imdb_id' => 'tt10068916'
-// По id imdb
-];
-//Делаем запрос и расшифровываем данные
-$data = json_decode(search($search), true);
-// Выводим полученый масив данных и показываем плеер
-print_r($data);
-echo '<iframe src="' . $data['src'] . '" width="100%" height="420" frameborder="0" allowfullscreen></iframe>';
+
+function videocdn($title, $type, $year = '') {
+	if ($type == 'tv') {
+		//Проверка для сериалов
+		$json_tv_series = json_decode(videocdn_get(['query' => $title, 'year' => $year], 'tv-series'), true);
+		$json_tv_show = json_decode(videocdn_get(['query' => $title, 'year' => $year], 'show-tv-series'), true);
+		$json_tv_anime = json_decode(videocdn_get(['query' => $title, 'year' => $year], 'anime-tv-series'), true);
+		if ($json_tv_series['status'] == 'true') {
+			$response = $json_tv_series;
+		}
+		elseif ($json_tv_show['status'] == 'true') {
+			$response = $json_tv_show;
+		}
+		elseif ($json_tv_anime['status'] == 'true') {
+			$response = $json_tv_anime;
+		}
+	}
+	else {
+		//Проверка для фильмов
+		$json_movie = json_decode(videocdn_get(['query' => $title, 'year' => $year], 'movies'), true);
+		$json_anime = json_decode(videocdn_get(['query' => $title, 'year' => $year], 'animes'), true);
+		if ($json_movie['status'] == 'true') {
+			$response = $json_movie;
+		}
+		elseif ($json_anime['status'] == 'true') {
+			$response = $json_anime;
+		}
+	}
+	return json_encode($response);
+}
+
+//print_r (videocdn('Евангелион', 'tv', 1995));
+print_r (videocdn('Призрак в доспехах', 'movie', 1995));
+
